@@ -1,0 +1,3 @@
+CREATE TABLE matriculas (
+    id INT AUTO_INCREMENT PRIMARY KEY
+);
