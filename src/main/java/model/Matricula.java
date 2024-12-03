@@ -51,4 +51,10 @@ public class Matricula {
     public void setTurma(Turma turma) {
         this.turma = turma;
     }
+
+    public void setAlunoId(Integer alunoId) {
+    }
+
+    public void setTurmaId(Integer turmaId) {
+    }
 }

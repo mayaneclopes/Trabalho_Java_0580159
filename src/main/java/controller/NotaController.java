@@ -1,18 +1,14 @@
 package controller;
 
-import dto.NotaDTO;
 import model.Nota;
-import model.Matricula;
-import model.Disciplina;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import repository.NotaRepository;
-import repository.MatriculaRepository;
 import repository.DisciplinaRepository;
+import repository.MatriculaRepository;
+import repository.NotaRepository;
 
-import java.util.List;
+import java.util.Date;
 import java.util.Optional;
 
 @RestController
@@ -24,83 +20,58 @@ public class NotaController {
     private final DisciplinaRepository disciplinaRepository;
 
     @Autowired
-    public NotaController(NotaRepository notaRepository, MatriculaRepository matriculaRepository, DisciplinaRepository disciplinaRepository) {
+    public NotaController(NotaRepository notaRepository,
+                          MatriculaRepository matriculaRepository,
+                          DisciplinaRepository disciplinaRepository) {
         this.notaRepository = notaRepository;
         this.matriculaRepository = matriculaRepository;
         this.disciplinaRepository = disciplinaRepository;
     }
 
-    @GetMapping
-    public ResponseEntity<List<NotaDTO>> getAllNotas() {
-        List<NotaDTO> notasDTO = notaRepository.findAll()
-                .stream()
-                .map(nota -> new NotaDTO(nota.getId(), nota.getMatricula().getId(), nota.getDisciplina().getId(),
-                        nota.getNota(), nota.getDataLancamento().toString()))
-                .toList();
+    @PostMapping("/cadastrar")
+    public ResponseEntity<String> cadastrarNota(@RequestParam Integer matriculaId,
+                                                @RequestParam Integer disciplinaId,
+                                                @RequestParam Double nota) {
 
-        if (notasDTO.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
-        } else {
-            return ResponseEntity.ok(notasDTO);
+        if (!matriculaRepository.existsById(matriculaId)) {
+            return ResponseEntity.badRequest().body("Matrícula não encontrada.");
         }
+
+        if (!disciplinaRepository.existsById(disciplinaId)) {
+            return ResponseEntity.badRequest().body("Disciplina não encontrada.");
+        }
+
+
+        if (notaRepository.findByMatriculaIdAndDisciplinaId(matriculaId, disciplinaId).isPresent()) {
+            return ResponseEntity.badRequest().body(
+                    "Nota já foi lançada para esta disciplina e matrícula.");
+        }
+        Nota novaNota = new Nota();
+        novaNota.setMatriculaId(matriculaId);
+        novaNota.setDisciplinaId(disciplinaId);
+        novaNota.setNota(nota);
+        novaNota.setDataLancamento((java.sql.Date) new Date());
+        notaRepository.save(novaNota);
+
+        return ResponseEntity.ok("Nota cadastrada com sucesso!");
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<NotaDTO> getNotaById(@PathVariable Integer id) {
-        Optional<Nota> nota = notaRepository.findById(id);
-        return nota.map(value -> ResponseEntity.ok(new NotaDTO(value.getId(), value.getMatricula().getId(),
-                        value.getDisciplina().getId(), value.getNota(), value.getDataLancamento().toString())))
-                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).build()); //erro valid
-    }
+    @PutMapping("/atualizar")
+    public ResponseEntity<String> atualizarNota(@RequestParam Integer matriculaId,
+                                                @RequestParam Integer disciplinaId,
+                                                @RequestParam Double novaNota) {
 
-    @PostMapping
-    public ResponseEntity<NotaDTO> createNota(@RequestBody NotaDTO notaDTO) {
-        Optional<Matricula> matriculaOptional = matriculaRepository.findById(notaDTO.matriculaId());
-        Optional<Disciplina> disciplinaOptional = disciplinaRepository.findById(notaDTO.disciplinaId());
-
-        if (matriculaOptional.isPresent() && disciplinaOptional.isPresent()) {
-            Nota nota = new Nota(matriculaOptional.get(), disciplinaOptional.get(), notaDTO.nota(),
-                    java.sql.Date.valueOf(notaDTO.dataLancamento()));
-            notaRepository.save(nota);
-            return ResponseEntity.status(HttpStatus.CREATED).body(new NotaDTO(nota.getId(), nota.getMatricula().getId(),
-                    nota.getDisciplina().getId(), nota.getNota(), nota.getDataLancamento().toString()));
-        } else {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build(); //erros valid
+        Optional<Object> notaOptional = notaRepository.findByMatriculaIdAndDisciplinaId(matriculaId, disciplinaId);
+        if (notaOptional.isEmpty()) {
+            return ResponseEntity.badRequest().body(
+                    "Nota não encontrada para a matrícula e disciplina especificadas.");
         }
-    }
 
-    @PutMapping("/{id}")
-    public ResponseEntity<NotaDTO> updateNota(@PathVariable Integer id, @RequestBody NotaDTO notaDTO) {
-        Optional<Nota> notaOptional = notaRepository.findById(id);
-        if (notaOptional.isPresent()) {
-            Nota nota = notaOptional.get();
-            Optional<Matricula> matriculaOptional = matriculaRepository.findById(notaDTO.matriculaId());
-            Optional<Disciplina> disciplinaOptional = disciplinaRepository.findById(notaDTO.disciplinaId());
+        Nota nota = (Nota) notaOptional.get();
+        nota.setNota(novaNota);
+        nota.setDataLancamento((java.sql.Date) new Date());
+        notaRepository.save(nota);
 
-            if (matriculaOptional.isPresent() && disciplinaOptional.isPresent()) {
-                nota.setMatricula(matriculaOptional.get());
-                nota.setDisciplina(disciplinaOptional.get());
-                nota.setNota(notaDTO.nota());
-                nota.setDataLancamento(java.sql.Date.valueOf(notaDTO.dataLancamento()));
-                notaRepository.save(nota);
-                return ResponseEntity.ok(new NotaDTO(nota.getId(), nota.getMatricula().getId(),
-                        nota.getDisciplina().getId(), nota.getNota(), nota.getDataLancamento().toString()));
-            } else {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();  // erro
-            }
-        } else {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-        }
-    }
-
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteNota(@PathVariable Integer id) {
-        Optional<Nota> notaOptional = notaRepository.findById(id);
-        if (notaOptional.isPresent()) {
-            notaRepository.delete(notaOptional.get());
-            return ResponseEntity.noContent().build();
-        } else {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-        }
+        return ResponseEntity.ok("Nota atualizada com sucesso!");
     }
 }

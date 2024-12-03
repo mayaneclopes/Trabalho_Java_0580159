@@ -72,4 +72,10 @@ public class Nota {
     public void setDataLancamento(Date dataLancamento) {
         this.dataLancamento = dataLancamento;
     }
+
+    public void setMatriculaId(Integer matriculaId) {
+    }
+
+    public void setDisciplinaId(Integer disciplinaId) {
+    }
 }
